@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SPA with conditional Splunk RUM (local script)</title>
+ 
+  <!--
+    Conditionally load Splunk RUM from a LOCAL bundle when the URL contains ?rum=true
+    Place the agent files under /vendor/splunk-rum/ (served by your app), e.g.:
+      /vendor/splunk-rum/splunk-otel-web.js
+      /vendor/splunk-rum/splunk-otel-web-session-recorder.js
+    Must run as early as possible in <head> so RUM captures the full page load.
+  -->
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var enabled = params.get('rum') === 'true';
+ 
+        // Persist the flag for the session so SPA route changes keep RUM on
+        // even after the query string is stripped by the router.
+        try {
+          if (enabled) sessionStorage.setItem('splunk_rum_enabled', '1');
+          if (sessionStorage.getItem('splunk_rum_enabled') === '1') enabled = true;
+        } catch (e) {}
+ 
+        if (enabled) loadSplunkRum();
+      } catch (e) {
+        console.warn('[SplunkRUM] init skipped:', e);
+      }
+ 
+      function loadSplunkRum() {
+        if (window.__splunkRumLoaded) return;
+        window.__splunkRumLoaded = true;
+ 
+        // 1) Load the Splunk RUM agent from a LOCAL path
+        var s = document.createElement('script');
+        s.src = '/vendor/splunk-rum/splunk-otel-web.js';
+        s.async = false; // keep ordering so init runs after load
+        s.onload = initRum;
+        s.onerror = function () { console.warn('[SplunkRUM] failed to load local agent'); };
+        document.head.appendChild(s);
+ 
+        // 2) (Optional) Session Recorder — also served locally
+        var r = document.createElement('script');
+        r.src = '/vendor/splunk-rum/splunk-otel-web-session-recorder.js';
+        r.async = false;
+        r.onload = initSessionRecorder;
+        document.head.appendChild(r);
+      }
+ 
+      function initRum() {
+        if (!window.SplunkRum) return;
+        window.SplunkRum.init({
+          realm: 'us1',                            // <-- your Splunk realm
+          rumAccessToken: 'YOUR_RUM_ACCESS_TOKEN', // <-- your RUM token
+          applicationName: 'my-spa',
+          version: '1.0.0',
+          deploymentEnvironment: 'production',
+          globalAttributes: { 'rum.debug.enabled': true }
+        });
+        console.info('[SplunkRUM] initialized');
+      }
+ 
+      function initSessionRecorder() {
+        if (!window.SplunkSessionRecorder || !window.SplunkRum) return;
+        window.SplunkSessionRecorder.init({
+          realm: 'us1',
+          rumAccessToken: 'YOUR_RUM_ACCESS_TOKEN'
+        });
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div id="app">Open this page with <code>?rum=true</code> to enable Splunk RUM.</div>
+</body>
+</html>

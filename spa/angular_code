@@ -1,0 +1,31 @@
+// main.ts
+import SplunkRum from '@splunk/otel-web';
+import SplunkSessionRecorder from '@splunk/otel-web-session-recorder';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { AppComponent } from './app/app.component';
+import { appConfig } from './app/app.config';
+
+const params = new URLSearchParams(window.location.search);
+const rumEnabled = params.get('rum') === 'true';
+
+if (rumEnabled) {
+  SplunkRum.init({
+    realm: '<YOUR_REALM>',                    // e.g. 'us1'
+    rumAccessToken: '<YOUR_RUM_ACCESS_TOKEN>',
+    applicationName: 'my-angular-app',
+    deploymentEnvironment: 'prod',
+    version: '1.0.0',
+    instrumentations: {
+      interactions: true,
+      longtask: true,
+      visibility: true,
+    },
+  });
+
+  SplunkSessionRecorder.init({
+    realm: '<YOUR_REALM>',
+    rumAccessToken: '<YOUR_RUM_ACCESS_TOKEN>',
+  });
+}
+
+bootstrapApplication(AppComponent, appConfig);
